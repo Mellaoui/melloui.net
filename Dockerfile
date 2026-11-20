@@ -1,8 +1,9 @@
 # Build the static site, then serve dist/ with nginx.
 # Coolify: Build Pack "Dockerfile", port 80. TLS and the domain are handled by Coolify's proxy.
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
-RUN corepack enable
+# Node 25+ no longer bundles Corepack; install it so the pinned pnpm (packageManager) is used.
+RUN npm install -g corepack@latest && corepack enable
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY . .
