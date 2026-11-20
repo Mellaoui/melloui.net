@@ -1,0 +1,16 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import ArticleList from '@/components/ui/ArticleList.astro';
+import { getArticles } from '@/lib/content';
+
+const articles = await getArticles();
+---
+
+<BaseLayout title="Writing" description="Technical articles on backend architecture, distributed systems, data, and AI engineering.">
+  <section class="container-page py-16 md:py-24">
+    <p class="eyebrow">Writing</p>
+    <h1 class="text-display text-ink mt-4 font-extrabold">Writing</h1>
+    <p class="text-lead text-ink-muted mt-5 mb-14 max-w-2xl">Technical articles on architecture, data, and AI engineering.</p>
+    <ArticleList articles={articles} />
+  </section>
+</BaseLayout>

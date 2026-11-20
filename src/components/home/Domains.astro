@@ -1,0 +1,57 @@
+---
+import { Brain, Database, Server } from '@lucide/astro';
+import SectionHeading from '@/components/ui/SectionHeading.astro';
+
+// `detail` is a schematic of the concern each domain covers, not a claim about a specific project.
+const domains = [
+  {
+    icon: Database,
+    name: 'Data',
+    body: 'Database architecture, synchronization, consistency, and event-driven workflows.',
+    detail: ['// keep stores in step', 'write → outbox → event', 'event → sync(db_a, db_b)'],
+  },
+  {
+    icon: Server,
+    name: 'Systems',
+    body: 'APIs, distributed components, queues, and production reliability.',
+    detail: ['// accept now, process safely', 'POST /orders → 202 Accepted', 'queue → worker → retry'],
+  },
+  {
+    icon: Brain,
+    name: 'Intelligence',
+    body: 'RAG, retrieval systems, and LLM-powered applications.',
+    detail: ['// answer from your own data', 'query → embed → retrieve(k)', 'context → generate'],
+  },
+];
+---
+
+<section aria-labelledby="domains-title" class="bg-night text-night-ink py-20 md:py-28">
+  <div class="container-page">
+    <SectionHeading eyebrow="Engineering domains" title="Data → Systems → Intelligence" id="domains-title" dark>
+      <p class="text-night-muted text-lead mt-4">
+        Three layers of the same problem: moving, serving, and understanding information reliably.
+      </p>
+    </SectionHeading>
+    <ol class="grid gap-5 md:grid-cols-3">
+      {domains.map((d, i) => (
+        <li class="bg-night-surface/60 border-night-surface flex flex-col rounded-(--radius-card) border p-7">
+          <div class="flex items-center justify-between">
+            <span class="bg-accent/15 grid size-11 place-items-center rounded-full">
+              <d.icon class="text-accent-soft size-5" aria-hidden="true" />
+            </span>
+            <span class="text-night-muted font-mono text-xs">0{i + 1}</span>
+          </div>
+          <h3 class="text-h3 mt-6 font-bold">{d.name}</h3>
+          <p class="text-night-muted mt-2">{d.body}</p>
+          <div class="mt-auto pt-6" aria-hidden="true">
+            <div class="bg-night border-night-surface overflow-x-auto rounded-2xl border px-4 py-3 font-mono text-xs leading-6 whitespace-pre">
+              {d.detail.map((line, j) => (
+                <span class:list={['block', j === 0 ? 'text-night-muted' : 'text-night-ink']}>{line}</span>
+              ))}
+            </div>
+          </div>
+        </li>
+      ))}
+    </ol>
+  </div>
+</section>

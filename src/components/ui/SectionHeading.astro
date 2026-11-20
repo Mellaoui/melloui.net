@@ -1,0 +1,18 @@
+---
+interface Props {
+  eyebrow: string;
+  title: string;
+  id?: string;
+  dark?: boolean;
+}
+
+const { eyebrow, title, id, dark = false } = Astro.props;
+---
+
+<div class="mb-10 max-w-3xl md:mb-14">
+  <p class={dark ? 'eyebrow text-accent-soft' : 'eyebrow'}>{eyebrow}</p>
+  <h2 id={id} class:list={['text-h2 mt-3 font-bold', dark ? 'text-night-ink' : 'text-ink']}>
+    {title}
+  </h2>
+  <slot />
+</div>

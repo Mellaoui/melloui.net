@@ -1,0 +1,146 @@
+---
+import { Menu, Moon, Sun, X } from '@lucide/astro';
+import { nav, site } from '@/lib/site';
+
+const path = Astro.url.pathname;
+// Contact gets its own button, so the pill nav holds the pages only.
+const links = [{ label: 'Home', href: '/' }, ...nav.filter((item) => !item.href.includes('#'))];
+const isActive = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
+---
+
+<header class="bg-bg/75 border-line/60 sticky top-0 z-40 border-b shadow-[0_8px_24px_-18px_rgb(16_24_41/0.18)] dark:shadow-[0_8px_32px_-12px_rgb(0_0_0/0.5)] backdrop-blur-2xl">
+  <div class="container-page flex h-18 items-center justify-between gap-3">
+    <a href="/" class="font-heading text-ink group flex items-center text-lg font-bold tracking-tight">
+      <span class="text-accent mr-0.5 font-mono transition-transform group-hover:-translate-x-0.5">&lt;</span>
+      {site.shortName}
+      <span class="text-accent-soft ml-0.5 font-mono transition-transform group-hover:translate-x-0.5">/&gt;</span>
+    </a>
+
+    <nav aria-label="Main" class="bg-surface border-line hidden rounded-full border p-1.5 md:block">
+      <ul class="flex items-center gap-1 text-sm">
+        {links.map((item) => (
+          <li>
+            <a
+              href={item.href}
+              aria-current={isActive(item.href) ? 'page' : undefined}
+              class="text-ink-muted hover:text-ink hover:bg-line/50 aria-[current=page]:bg-line aria-[current=page]:text-accent block rounded-full px-4 py-1.5 font-medium transition-colors aria-[current=page]:font-semibold aria-[current=page]:shadow-inner"
+            >
+              {item.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+
+    <div class="flex items-center gap-2">
+      <a
+        href="/#contact"
+        class="btn-accent hidden rounded-full px-5 py-2 text-sm font-semibold transition-transform active:scale-95 sm:inline-flex"
+      >
+        Contact
+      </a>
+      <button
+        type="button"
+        data-theme-toggle
+        aria-label="Switch to dark theme"
+        class="text-ink-muted hover:text-ink border-line hover:border-accent grid size-9 shrink-0 place-items-center rounded-full border transition-colors"
+      >
+        <Moon class="size-4 dark:hidden" aria-hidden="true" />
+        <Sun class="hidden size-4 dark:block" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        data-menu-toggle
+        aria-expanded="false"
+        aria-controls="mobile-menu"
+        aria-label="Open menu"
+        class="text-ink border-line hover:border-accent group grid size-9 shrink-0 place-items-center rounded-full border transition-colors md:hidden"
+      >
+        <Menu class="size-4 group-aria-expanded:hidden" aria-hidden="true" />
+        <X class="hidden size-4 group-aria-expanded:block" aria-hidden="true" />
+      </button>
+    </div>
+  </div>
+
+  <nav id="mobile-menu" aria-label="Main" class="border-line hidden border-t md:hidden" data-menu>
+    <ul class="container-page flex flex-col gap-1 py-3">
+      {links.map((item) => (
+        <li>
+          <a
+            href={item.href}
+            aria-current={isActive(item.href) ? 'page' : undefined}
+            class="text-ink-muted hover:text-ink hover:bg-line/50 aria-[current=page]:bg-line aria-[current=page]:text-accent block rounded-xl px-4 py-2.5 font-medium transition-colors"
+          >
+            {item.label}
+          </a>
+        </li>
+      ))}
+      <li class="sm:hidden">
+        <a href="/#contact" class="btn-accent mt-2 block rounded-xl px-4 py-2.5 text-center font-semibold">
+          Contact
+        </a>
+      </li>
+    </ul>
+  </nav>
+</header>
+
+<script>
+  const root = document.documentElement;
+  const themeButton = document.querySelector<HTMLButtonElement>('[data-theme-toggle]');
+  const systemDark = matchMedia('(prefers-color-scheme: dark)');
+
+  const saved = (): string | null => {
+    try {
+      return localStorage.getItem('theme');
+    } catch {
+      return null;
+    }
+  };
+
+  const apply = (theme: 'light' | 'dark') => {
+    root.dataset.theme = theme;
+    themeButton?.setAttribute('aria-label', theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
+  };
+
+  apply(root.dataset.theme === 'dark' ? 'dark' : 'light');
+
+  themeButton?.addEventListener('click', () => {
+    const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    apply(next);
+    try {
+      localStorage.setItem('theme', next);
+    } catch {
+      // Storage blocked: the choice lasts for this page only.
+    }
+  });
+
+  // Follow the system setting until the visitor picks a theme.
+  systemDark.addEventListener('change', (event) => {
+    if (!saved()) apply(event.matches ? 'dark' : 'light');
+  });
+
+  // Mobile menu.
+  const menuButton = document.querySelector<HTMLButtonElement>('[data-menu-toggle]');
+  const menu = document.querySelector<HTMLElement>('[data-menu]');
+
+  const setMenu = (open: boolean) => {
+    if (!menuButton || !menu) return;
+    menuButton.setAttribute('aria-expanded', String(open));
+    menuButton.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    menu.classList.toggle('hidden', !open);
+  };
+
+  menuButton?.addEventListener('click', () => setMenu(menuButton.getAttribute('aria-expanded') !== 'true'));
+  menu?.addEventListener('click', (event) => {
+    if ((event.target as HTMLElement).closest('a')) setMenu(false);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && menuButton?.getAttribute('aria-expanded') === 'true') {
+      setMenu(false);
+      menuButton.focus();
+    }
+  });
+  matchMedia('(min-width: 48rem)').addEventListener('change', (event) => {
+    if (event.matches) setMenu(false);
+  });
+</script>

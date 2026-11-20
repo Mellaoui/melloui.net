@@ -1,0 +1,18 @@
+---
+import SectionHeading from '@/components/ui/SectionHeading.astro';
+import { about } from '@/lib/site';
+---
+
+<section aria-labelledby="about-title" class="border-line border-t">
+  <div class="container-page grid gap-10 py-20 md:py-28 lg:grid-cols-[1fr_1.4fr]">
+    <SectionHeading eyebrow="About" title="Backend depth, product judgment" id="about-title" />
+    <div class="text-lead text-ink-muted space-y-5">
+      {about.paragraphs.map((p) => (
+        <p>{p}</p>
+      ))}
+      <a href="/about/" class="text-accent inline-block font-semibold underline-offset-4 hover:underline">
+        More about me →
+      </a>
+    </div>
+  </div>
+</section>

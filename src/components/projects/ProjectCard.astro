@@ -1,0 +1,42 @@
+---
+import { ArrowUpRight } from '@lucide/astro';
+import type { Project } from '@/lib/content';
+
+interface Props {
+  project: Project;
+}
+
+const { project } = Astro.props;
+const { title, description, category, technologies, status } = project.data;
+const href = `/work/${project.id}/`;
+---
+
+<a
+  href={href}
+  class:list={[
+    'group border-line shadow-card flex h-full flex-col rounded-(--radius-card) border bg-surface p-6 transition',
+    'hover:border-accent/50 hover:-translate-y-0.5',
+  ]}
+>
+  <div class="flex items-center justify-between gap-3">
+    <span class="eyebrow">{category}</span>
+    <span class="flex items-center gap-2">
+      {status === 'live' && (
+        <span class="code-tag text-emerald-700 dark:text-emerald-400">
+          <span class="size-1.5 rounded-full bg-current" aria-hidden="true" />
+          live
+        </span>
+      )}
+      <ArrowUpRight class="text-ink-muted group-hover:text-accent size-5 transition-colors" aria-hidden="true" />
+    </span>
+  </div>
+  <h3 class="text-h3 text-ink mt-5 font-bold">{title}</h3>
+  <p class="text-ink-muted mt-2 flex-1">{description}</p>
+  {technologies.length > 0 && (
+    <ul class="mt-5 flex flex-wrap gap-2" aria-label="Technologies">
+      {technologies.map((t) => (
+        <li class="bg-bg text-ink-muted rounded-md px-2 py-1 font-mono text-xs">{t}</li>
+      ))}
+    </ul>
+  )}
+</a>

@@ -1,0 +1,41 @@
+---
+import type { GetStaticPaths } from 'astro';
+import { render } from 'astro:content';
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { formatDate, getArticles, type Article } from '@/lib/content';
+
+export const getStaticPaths = (async () => {
+  const articles = await getArticles();
+  return articles.map((article) => ({ params: { slug: article.id }, props: { article } }));
+}) satisfies GetStaticPaths;
+
+interface Props {
+  article: Article;
+}
+
+const { article } = Astro.props;
+const { title, description, publishedAt, updatedAt, tags } = article.data;
+const { Content } = await render(article);
+---
+
+<BaseLayout title={title} description={description} type="article">
+  <article class="container-page py-16 md:py-24">
+    <a href="/writing/" class="text-ink-muted hover:text-accent text-sm">
+      ← All writing
+    </a>
+    <h1 class="text-display text-ink mt-8 max-w-4xl font-extrabold">{title}</h1>
+    <p class="text-ink-muted mt-5 font-mono text-sm">
+      <time datetime={publishedAt.toISOString()}>{formatDate(publishedAt)}</time>
+      {updatedAt && (
+        <>
+          {' '}
+          · updated <time datetime={updatedAt.toISOString()}>{formatDate(updatedAt)}</time>
+        </>
+      )}
+      {tags.length > 0 && <> · {tags.join(', ')}</>}
+    </p>
+    <div class="prose-content text-ink mt-12">
+      <Content />
+    </div>
+  </article>
+</BaseLayout>

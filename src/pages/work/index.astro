@@ -1,0 +1,24 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import ProjectCard from '@/components/projects/ProjectCard.astro';
+import { getProjects } from '@/lib/content';
+
+const projects = await getProjects();
+---
+
+<BaseLayout title="Work" description="Architecture case studies and independent projects in backend engineering, systems, and AI.">
+  <section class="container-page py-16 md:py-24">
+    <p class="eyebrow">Work</p>
+    <h1 class="text-display text-ink mt-4 font-extrabold">Selected work</h1>
+    <p class="text-lead text-ink-muted mt-5 max-w-2xl">
+      Products running in production. Case studies on backend architecture and integrations will be added here as they are written.
+    </p>
+    <ul class:list={['mt-14 grid gap-5 md:grid-cols-2', projects.length > 2 && 'lg:grid-cols-3']}>
+      {projects.map((project) => (
+        <li>
+          <ProjectCard project={project} />
+        </li>
+      ))}
+    </ul>
+  </section>
+</BaseLayout>

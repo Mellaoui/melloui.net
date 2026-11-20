@@ -1,0 +1,32 @@
+---
+import type { Article } from '@/lib/content';
+import { formatDate } from '@/lib/content';
+
+interface Props {
+  articles: Article[];
+}
+
+const { articles } = Astro.props;
+---
+
+{articles.length === 0 ? (
+  <p class="border-line text-ink-muted rounded-(--radius-card) border border-dashed p-8 text-center">
+    The first articles are being written. Check back soon.
+  </p>
+) : (
+  <ul class="divide-line border-line divide-y border-y">
+    {articles.map((a) => (
+      <li>
+        <a href={`/writing/${a.id}/`} class="group flex flex-col gap-1 py-6 sm:flex-row sm:items-baseline sm:justify-between sm:gap-8">
+          <span>
+            <span class="text-h3 text-ink group-hover:text-accent block font-bold transition-colors">{a.data.title}</span>
+            <span class="text-ink-muted mt-1 block">{a.data.description}</span>
+          </span>
+          <time datetime={a.data.publishedAt.toISOString()} class="text-ink-muted shrink-0 font-mono text-sm">
+            {formatDate(a.data.publishedAt)}
+          </time>
+        </a>
+      </li>
+    ))}
+  </ul>
+)}

@@ -1,0 +1,208 @@
+---
+// Hero visual: Think → Design → Orchestrate → Validate → Deliver.
+// One particle cloud morphs into a lightbulb, an architecture diagram, an AI hub, a shield and a rocket.
+// Static icons render first as the fallback; Three.js is lazy-loaded and never blocks first paint.
+import { Lightbulb, Network, Rocket, ShieldCheck, Workflow } from '@lucide/astro';
+import { heroConfig, heroPhases } from './config';
+
+const icons = [Lightbulb, Workflow, Network, ShieldCheck, Rocket];
+const pad = (n: number) => String(n).padStart(2, '0');
+---
+
+<figure
+  data-hero
+  data-hold={heroConfig.hold}
+  class="bg-night border-night-surface relative m-0 h-[clamp(440px,52vw,580px)] w-full overflow-hidden rounded-[2rem] border text-white"
+>
+  <!-- Phase-coloured glow behind the particles -->
+  {heroPhases.map((p, i) => (
+    <div
+      aria-hidden="true"
+      data-phase-item={i}
+      data-active={i === 0 ? '' : undefined}
+      class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-1000 data-active:opacity-100"
+      style={`background: radial-gradient(55% 50% at 50% 42%, ${p.colors[1]}33, transparent 72%)`}
+    />
+  ))}
+
+  <!-- Static fallback: one icon per phase -->
+  <div data-hero-fallback aria-hidden="true" class="absolute inset-0 grid place-items-center pb-36 transition-opacity duration-700">
+    {icons.map((Icon, i) => (
+      <span
+        data-phase-item={i}
+        data-active={i === 0 ? '' : undefined}
+        class="col-start-1 row-start-1 opacity-0 transition-opacity duration-700 data-active:opacity-100"
+        style={`color: ${heroPhases[i]!.colors[0]}`}
+      >
+        <Icon class="size-36" stroke-width={1} />
+      </span>
+    ))}
+  </div>
+
+  <canvas
+    data-hero-canvas
+    class="absolute inset-0 size-full touch-pan-y opacity-0 transition-opacity duration-1000"
+    aria-hidden="true"
+  ></canvas>
+
+  <!-- Bottom fade so the caption stays readable -->
+  <div
+    aria-hidden="true"
+    class="from-night via-night/70 pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-t to-transparent"
+  ></div>
+
+  <div class="pointer-events-none absolute inset-x-5 top-5 flex items-start justify-between gap-4">
+    <span class="text-night-muted font-mono text-xs">From problem to production</span>
+    <span
+      aria-hidden="true"
+      class="grid font-mono text-[clamp(3rem,6vw,4.75rem)] leading-[0.8] font-semibold tracking-tighter text-white/[0.08]"
+    >
+      {heroPhases.map((_, i) => (
+        <span
+          data-phase-item={i}
+          data-active={i === 0 ? '' : undefined}
+          class="col-start-1 row-start-1 translate-y-3 text-right opacity-0 transition duration-700 data-active:translate-y-0 data-active:opacity-100"
+        >
+          {pad(i + 1)}
+        </span>
+      ))}
+    </span>
+  </div>
+
+  <figcaption class="absolute inset-x-4 bottom-4 flex flex-col gap-4">
+    <div class="pointer-events-none mx-1 grid" aria-hidden="true">
+      {heroPhases.map((p, i) => (
+        <div
+          data-phase-item={i}
+          data-active={i === 0 ? '' : undefined}
+          class="col-start-1 row-start-1 flex translate-y-2 flex-col gap-2 opacity-0 blur-sm transition duration-700 data-active:translate-y-0 data-active:opacity-100 data-active:blur-none"
+        >
+          <span class="text-night-muted flex items-center gap-2 font-mono text-[0.7rem] tracking-[0.16em] uppercase">
+            <span class="h-px w-6" style={`background: ${p.colors[0]}`} />
+            {pad(i + 1)} / {pad(heroPhases.length)} · {p.label}
+          </span>
+          <p class="font-heading text-[clamp(1.05rem,1.6vw,1.25rem)] leading-snug font-semibold text-balance">{p.caption}</p>
+        </div>
+      ))}
+    </div>
+    <p data-hero-live class="sr-only" aria-live="polite">
+      {heroPhases[0]!.label}: {heroPhases[0]!.caption}
+    </p>
+
+    <div
+      role="group"
+      aria-label="Show step"
+      data-hero-tabs
+      class="flex snap-x gap-1 overflow-x-auto rounded-full bg-white/10 p-1 backdrop-blur-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      {heroPhases.map((p, i) => (
+        <button
+          type="button"
+          data-hero-tab={i}
+          aria-pressed={i === 0 ? 'true' : 'false'}
+          class="relative h-11 flex-[1_0_auto] snap-center overflow-hidden rounded-full px-4 text-sm whitespace-nowrap font-semibold text-white/70 transition-colors hover:text-white aria-pressed:bg-white aria-pressed:text-[#101829]"
+        >
+          {p.label}
+          <span aria-hidden="true" class="absolute inset-x-5 bottom-1.5 h-0.5 overflow-hidden rounded-full bg-black/10">
+            <span data-hero-progress class="block size-full origin-left scale-x-0" style={`background: ${p.colors[1]}`} />
+          </span>
+        </button>
+      ))}
+    </div>
+  </figcaption>
+</figure>
+
+<script>
+  import { heroPhases } from './config';
+
+  const root = document.querySelector<HTMLElement>('[data-hero]');
+  const canvas = root?.querySelector<HTMLCanvasElement>('[data-hero-canvas]');
+  const fallback = root?.querySelector<HTMLElement>('[data-hero-fallback]');
+  const live = root?.querySelector<HTMLElement>('[data-hero-live]');
+
+  if (root && canvas && fallback && live) {
+    const tabs = [...root.querySelectorAll<HTMLButtonElement>('[data-hero-tab]')];
+    const hold = Number(root.dataset.hold) || 6;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let phase = 0;
+    let elapsed = 0;
+    let hovering = false;
+    let focused = false;
+    let inView = true;
+    let manager: { setPhase(i: number): void; dispose(): void } | null = null;
+
+    const setProgress = (value: number) => {
+      tabs.forEach((tab, i) => {
+        const bar = tab.querySelector<HTMLElement>('[data-hero-progress]');
+        if (bar) bar.style.transform = `scaleX(${i === phase && !reducedMotion ? value : 0})`;
+      });
+    };
+
+    const select = (index: number) => {
+      phase = (index + heroPhases.length) % heroPhases.length;
+      elapsed = 0;
+      root.querySelectorAll<HTMLElement>('[data-phase-item]').forEach((el) => {
+        el.toggleAttribute('data-active', Number(el.dataset.phaseItem) === phase);
+      });
+      tabs.forEach((tab, i) => tab.setAttribute('aria-pressed', String(i === phase)));
+      const p = heroPhases[phase];
+      if (p) live.textContent = `${p.label}: ${p.caption}`;
+      setProgress(0);
+      manager?.setPhase(phase);
+      // Keep the active tab visible when the row scrolls on small screens.
+      const strip = root.querySelector<HTMLElement>('[data-hero-tabs]');
+      const active = tabs[phase];
+      if (strip && active && strip.scrollWidth > strip.clientWidth) {
+        strip.scrollTo({
+          left: active.offsetLeft - (strip.clientWidth - active.clientWidth) / 2,
+          behavior: reducedMotion ? 'auto' : 'smooth',
+        });
+      }
+    };
+
+    tabs.forEach((tab, i) => tab.addEventListener('click', () => select(i)));
+    root.addEventListener('pointerenter', () => (hovering = true));
+    root.addEventListener('pointerleave', () => (hovering = false));
+    root.addEventListener('focusin', () => (focused = true));
+    root.addEventListener('focusout', (e) => (focused = root.contains(e.relatedTarget as Node | null)));
+
+    // Auto-advance: paused on hover/focus, off-screen, in hidden tabs, and under reduced motion.
+    if (!reducedMotion) {
+      const step = 0.1;
+      setInterval(() => {
+        if (hovering || focused || !inView || document.hidden) return;
+        elapsed += step;
+        if (elapsed >= hold) select(phase + 1);
+        else setProgress(elapsed / hold);
+      }, step * 1000);
+    }
+
+    // Load Three.js only when the hero is near the viewport and the browser is idle.
+    const load = async () => {
+      const { SceneManager } = await import('./SceneManager');
+      const m = new SceneManager(root, canvas);
+      if (m.start(phase)) {
+        manager = m;
+        canvas.classList.replace('opacity-0', 'opacity-100');
+        fallback.classList.add('opacity-0');
+        // Keep the scene alive when the page goes into the back/forward cache.
+        window.addEventListener('pagehide', (e) => {
+          if (!e.persisted) m.dispose();
+        });
+      }
+    };
+
+    let loaded = false;
+    new IntersectionObserver(
+      (entries) => {
+        inView = entries.some((e) => e.isIntersecting);
+        if (inView && !loaded) {
+          loaded = true;
+          const idle = window.requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 200));
+          idle(() => void load());
+        }
+      },
+      { rootMargin: '200px' },
+    ).observe(root);
+  }
+</script>

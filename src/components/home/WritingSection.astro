@@ -1,0 +1,16 @@
+---
+import SectionHeading from '@/components/ui/SectionHeading.astro';
+import ArticleList from '@/components/ui/ArticleList.astro';
+import { getArticles } from '@/lib/content';
+
+const articles = (await getArticles()).slice(0, 3);
+---
+
+<section aria-labelledby="writing-title" class="border-line border-t">
+  <div class="container-page py-20 md:py-28">
+    <SectionHeading eyebrow="Writing" title="Notes on backend engineering" id="writing-title">
+      <p class="text-ink-muted text-lead mt-4">Technical articles on architecture, data, and AI engineering.</p>
+    </SectionHeading>
+    <ArticleList articles={articles} />
+  </div>
+</section>

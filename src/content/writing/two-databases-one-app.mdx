@@ -1,0 +1,150 @@
+---
+title: 'Two databases, one app: keeping them in step with an outbox'
+description: Why we split identity and business data into two databases for millions of users, and how a transactional outbox keeps them consistent without cross-database transactions.
+publishedAt: 2026-11-20
+tags: [backend, databases, laravel, architecture]
+draft: false
+---
+
+On a student administration platform I work on, the API talks to two MariaDB databases. One holds **identity**: users, roles, permissions, refresh tokens. The other holds **the business**: programs, enrollments, study periods, LMS servers, billing, sync logs.
+
+This post explains why we split them, the problem the split creates, and how a transactional outbox solves it.
+
+## Why two databases
+
+The platform has about 2 million users, and we're planning for 5 million. Two reasons drove the split.
+
+**Spread the load.** With everything in one database, every kind of work competes for the same server. Logins, token refreshes and registrations would share it with enrollments, schedules, LMS syncs, exports and billing. Splitting identity from business data puts that work on two servers, and each can be sized and tuned for its own traffic.
+
+**Keep admin work away from authentication.** Staff run heavy operations: bulk enrollments, exports, schedule and LMS syncs, mailing campaigns. None of that should slow down a student trying to log in. With identity in its own database, a long admin query or a big sync can't hold locks or eat resources that login needs. If the business database has a bad hour, students can still sign in.
+
+## The problem the split creates
+
+Splitting is the easy part. The hard part comes the first time one action has to change both databases.
+
+A student registers. The account belongs in the identity database. But the student also needs a copy of their user row and an enrollment in the business database, and from there an LMS server and a Moodle account.
+
+Say the account commits, and then the business database is unreachable, the PHP process restarts, or the queue is down. The student can log in but has no enrollment and never gets an LMS account. Nothing records that the second step is missing, so nobody notices until the student complains.
+
+The obvious fixes don't hold up:
+
+| Approach                                     | What goes wrong                                                                                    |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Write to both databases in the request       | A transaction covers one connection. If the second write fails, the first can't be rolled back.    |
+| Commit, then dispatch a job to copy          | If the process dies between the commit and the dispatch, the job is lost and nothing remembers it. |
+| Dispatch the job inside the transaction      | The job can run before the commit is visible, or for a user whose transaction then rolled back.    |
+| A distributed transaction (two-phase commit) | Complex, slows every write and locks both databases. The queue isn't part of it anyway.            |
+
+This is the **dual-write problem**, and it's what the rest of this post is about.
+
+## Two connections, configured differently
+
+In Laravel each database is just a named connection in `config/database.php`. They aren't configured the same way, because they aren't used the same way:
+
+```php
+'auth_db' => [
+    'driver' => 'mariadb',
+    // Identity: always read from the primary, never a replica.
+    'options' => [PDO::ATTR_TIMEOUT => 3],
+],
+
+'admin_db' => [
+    'driver' => 'mariadb',
+    // Business data: after a write, later reads in the same request
+    // use the same connection, so they see that write.
+    'sticky' => true,
+    'options' => [PDO::ATTR_TIMEOUT => 3],
+],
+```
+
+The short connect timeout is deliberate. If a database is unreachable, a request should fail in seconds, not hang a worker.
+
+There is also a third connection to the legacy Moodle database, used only for a one-off student migration. It's read-only and the running app never touches it. Keeping it as a separate, clearly labelled connection makes that obvious.
+
+## The rule: no cross-database transactions
+
+Since there's no rollback across `auth_db` and `admin_db`, the design starts from that limit, written down as a decision:
+
+- Each database is the **source of truth** for its own data. Identity owns users; the business database owns enrollments.
+- The business database keeps a **replica** of the user fields it needs (name, email, status), and the identity database keeps a mirror of enrollments for login and redirects.
+- Copying data between them is **eventually consistent**, not instant.
+- When code must write to both, the writes are **ordered**, and any job that depends on both is dispatched only after the second transaction commits.
+
+## The transactional outbox
+
+To copy changes reliably, we use the transactional outbox pattern. When a user is created or updated, the same transaction that writes the user also writes a row to an `outbox_events` table in the **same database**:
+
+```php
+[$user, $event] = DB::connection('auth_db')->transaction(function () use ($data) {
+    $user = User::create($data);
+
+    $event = OutboxEvent::create([
+        'type' => 'user.created',
+        'payload' => $user->toReplicaPayload(),
+        'status' => 'pending',
+    ]);
+
+    return [$user, $event];
+});
+
+// Fast path: start the copy right after the commit.
+dispatch(new ReplicateUserToAdminJob($event->payload, $event->id))->onQueue('sync');
+```
+
+Either both rows exist or neither does. There is no window where the user exists but the event was lost.
+
+The job is dispatched only **after** the transaction commits. Dispatching inside it could let a worker pick up the job before the user row is visible, or run a job for a user whose transaction then rolled back.
+
+Each database has its own outbox, because changes flow both ways:
+
+| Event                                           | Written in | Copied to |
+| ----------------------------------------------- | ---------- | --------- |
+| `user.created`, `user.updated`, `user.enrolled` | identity   | business  |
+| `user.profile.updated`                          | identity   | business  |
+| `enrollment.created`, `enrollment.updated`      | business   | identity  |
+
+The fast path handles the normal case. The outbox handles the rest: if the process dies between the commit and the dispatch, or the queue is down, the event is still in the table.
+
+A scheduled command, `automation:process-outbox`, runs every five minutes as the safety net. It reads pending events from both outboxes in id order, in chunks, and dispatches one queued job per event on a dedicated `sync` queue. It marks each event `processing` so the next run doesn't dispatch it again.
+
+This means the same event can be dispatched twice: once by the fast path, once by the processor if it runs before the first job finishes. That's by design, and it only works because of the next rule.
+
+## Jobs that can run twice
+
+Queues retry. A job can fail halfway, or succeed and then fail to report it. So every replication job has to be safe to run more than once.
+
+The main tool is an **upsert keyed on the source id**. The replica row has the same id as the user in the identity database, so running the job twice updates the same row instead of creating a second one:
+
+```php
+DB::connection('admin_db')->table('users')->upsert(
+    [$replicaRow],
+    uniqueBy: ['id'],
+    update: ['username', 'first_name', 'last_name', 'email', 'status', 'updated_at'],
+);
+```
+
+Two details took longer to get right than the pattern itself.
+
+**NULL doesn't collide in a unique index.** Enrollments are unique per user, program and language, but language is optional. In MariaDB, two rows with `language_id = NULL` don't violate a unique index, so a retried job could insert a duplicate enrollment. The fix is a generated column, `language_key = COALESCE(language_id, 0)`, with the unique index on that instead. A retry with no language now hits the same key.
+
+**Side effects need their own guard.** Assigning a student to an LMS server also increments that server's student count. If the job is retried after that transaction already committed, a plain retry would count the student twice. The job checks that the enrollment is still pending assignment before it activates it and increments the count, so the second run does nothing.
+
+Each job has a fixed number of tries with a backoff. On success it marks its outbox event `processed`; when it finally gives up, it marks the event `failed` and logs the payload id, so the problem is visible instead of silent.
+
+## Only emit events that matter
+
+The enrollment observer doesn't write an event on every save. It checks which fields changed and only emits `enrollment.updated` when something the identity side cares about changed: the status, the LMS server or the language. Fewer events means less queue traffic and fewer chances for an out-of-order update to overwrite newer data.
+
+## What this costs
+
+The outbox is not free, and it helps to be honest about the trade-offs:
+
+- **Delay.** Usually a change reaches the other database as fast as the queue runs the job. When the fast path fails, it waits for the processor: up to about five minutes, plus queue time. Screens that read the replica have to tolerate that, and anything that can't wait has to read from the source of truth.
+- **Every event type needs a handler.** The processor only dispatches event types it knows about. An event type written without a handler simply waits in the table. We had one, recorded in our architecture decisions, and it's easy to miss without a check that lists pending events by type.
+- **Watch the middle states.** A `processing` event whose job never ran won't be picked up again by a processor that only reads `pending`. Something has to notice events that stay in a middle state too long.
+
+## Would I split the databases again?
+
+Yes, but with the cost in mind from day one. At millions of users, the split keeps login traffic and heavy admin work from competing for the same database. In exchange, every feature that touches both has to answer the same questions: which side owns this data, what event carries the change, and what happens if the job runs twice.
+
+If you're about to add a second database to an app, write those three answers down before the first migration. The outbox table is the easy part.

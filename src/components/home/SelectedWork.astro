@@ -1,0 +1,23 @@
+---
+import ProjectCard from '@/components/projects/ProjectCard.astro';
+import SectionHeading from '@/components/ui/SectionHeading.astro';
+import { getProjects } from '@/lib/content';
+
+const projects = (await getProjects()).slice(0, 3);
+---
+
+<section aria-labelledby="work-title" class="container-page py-20 md:py-28">
+  <SectionHeading eyebrow="Selected work" title="Built and running in production" id="work-title">
+    <p class="text-ink-muted text-lead mt-4">Products I run today. Case studies on backend problems will follow as they are written.</p>
+  </SectionHeading>
+  <ul class:list={['grid gap-5 md:grid-cols-2', projects.length > 2 && 'lg:grid-cols-3']}>
+    {projects.map((project) => (
+      <li>
+        <ProjectCard project={project} />
+      </li>
+    ))}
+  </ul>
+  <a href="/work/" class="text-accent mt-8 inline-block font-semibold underline-offset-4 hover:underline">
+    All work →
+  </a>
+</section>

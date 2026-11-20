@@ -1,0 +1,58 @@
+---
+import { nav, site, socials } from '@/lib/site';
+
+const year = new Date().getFullYear();
+---
+
+<footer class="bg-night text-night-muted border-night-surface border-t">
+  <div class="container-page grid gap-10 py-14 text-sm md:grid-cols-[2fr_1fr]">
+    <div>
+      <a href="/" class="text-night-ink font-heading text-lg font-bold">
+        <span class="text-accent-soft font-mono">&lt;</span>
+        {site.shortName}
+        <span class="text-accent-soft font-mono">/&gt;</span>
+      </a>
+      <p class="mt-3 max-w-xs">{site.statement}</p>
+      <ul class="mt-5 flex flex-wrap gap-2">
+        {socials.map((s) => (
+          <li>
+            <a href={s.href} rel="me noopener" target="_blank" class="code-tag hover:text-night-ink transition-colors">
+              {s.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+
+    <nav aria-label="Footer">
+      <p class="eyebrow text-accent-soft text-xs">Navigation</p>
+      <ul class="mt-4 space-y-2.5">
+        <li>
+          <a href="/" class="hover:text-night-ink transition-colors">
+            Home
+          </a>
+        </li>
+        {nav.map((item) => (
+          <li>
+            <a href={item.href} class="hover:text-night-ink transition-colors">
+              {item.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  </div>
+
+  <div class="border-night-surface border-t">
+    <div class="container-page flex flex-col gap-3 py-6 text-xs sm:flex-row sm:items-center sm:justify-between">
+      <p>
+        © {year} {site.name}. Built by{' '}
+        <a href={site.organization.url} class="text-night-ink hover:text-accent-soft underline-offset-4 hover:underline">
+          {site.organization.name}
+        </a>
+        .
+      </p>
+      <p class="text-accent-soft font-mono">&lt;location: {site.location} /&gt;</p>
+    </div>
+  </div>
+</footer>

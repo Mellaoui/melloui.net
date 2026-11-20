@@ -1,0 +1,14 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import ButtonLink from '@/components/ui/ButtonLink.astro';
+---
+
+<BaseLayout title="Page not found" index={false}>
+  <section class="container-page py-24 md:py-32">
+    <p class="eyebrow">404</p>
+    <h1 class="text-display text-ink mt-4 font-extrabold">This page doesn't exist.</h1>
+    <ButtonLink href="/" class="mt-10">
+      Back to home
+    </ButtonLink>
+  </section>
+</BaseLayout>
